@@ -1,4 +1,4 @@
-name: Flathunt
+name: Flathunt Berlin
 
 # Runs one crawl of all configured sites, sends new listings to Telegram,
 # then commits the list of already-seen listings so nothing is sent twice.
