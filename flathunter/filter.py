@@ -156,6 +156,28 @@ class TitleFilter(AbstractFilter):
         return False
 
 
+class PostcodeFilter(AbstractFilter):
+    """Exclude exposes outside the allowed postcodes. Addresses without a postcode
+    are checked against the allowed district names instead, if any are configured"""
+
+    def __init__(self, allowed_postcodes, allowed_districts=None):
+        self.allowed = re.compile(
+            "^(?:" + "|".join(str(p) for p in allowed_postcodes) + ")$")
+        self.districts = [d.lower() for d in allowed_districts or []]
+
+    def is_interesting(self, expose):
+        """True if the postcode (or district) is allowed, or if the address is unknown"""
+        address = expose.get('address') or ''
+        if address == '' or address.startswith('http'):
+            return True
+        match = re.search(r'\b(\d{5})\b', address)
+        if match is not None:
+            return self.allowed.match(match[1]) is not None
+        if not self.districts:
+            return True
+        return any(district in address.lower() for district in self.districts)
+
+
 class PPSFilter(AbstractFilter):
     """Exclude exposes above a given price per square"""
 
@@ -196,6 +218,9 @@ class FilterBuilder:
         self._append_filter_if_not_empty(MaxRoomsFilter, config.max_rooms())
         self._append_filter_if_not_empty(
             PPSFilter, config.max_price_per_square())
+        if config.allowed_postcodes():
+            self.filters.append(
+                PostcodeFilter(config.allowed_postcodes(), config.allowed_districts()))
         return self
 
     def filter_already_seen(self, id_watch):

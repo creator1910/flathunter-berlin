@@ -1,0 +1,54 @@
+name: Flathunt
+
+# Runs one crawl of all configured sites, sends new listings to Telegram,
+# then commits the list of already-seen listings so nothing is sent twice.
+on:
+  schedule:
+    - cron: "*/10 * * * *"   # GitHub may start scheduled runs a few minutes late
+  workflow_dispatch:
+
+concurrency:
+  group: flathunt
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  hunt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-bot.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-bot.txt
+
+      - name: Hunt once
+        env:
+          FLATHUNTER_TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          FLATHUNTER_TELEGRAM_RECEIVER_IDS: ${{ secrets.TELEGRAM_RECEIVER_IDS }}
+          FLATHUNTER_DATABASE_LOCATION: state
+          FLATHUNTER_HEADLESS_BROWSER: "1"
+        run: |
+          # same config as local, but run a single pass instead of looping
+          sed 's/^\(\s*\)active: yes/\1active: no/' config.yaml > "$RUNNER_TEMP/config.yaml"
+          python flathunt.py -c "$RUNNER_TEMP/config.yaml"
+
+      - name: Save seen listings
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f state/processed_ids.db
+          if ! git diff --cached --quiet; then
+            git commit -m "Update seen listings"
+            git pull --rebase -X theirs
+            git push
+          fi

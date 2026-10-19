@@ -1,0 +1,24 @@
+# Runtime dependencies for running the bot (flathunt.py); see Pipfile for the full dev set
+PyYAML
+requests
+urllib3
+lxml
+requests-random-user-agent
+jsonpath-ng
+backoff
+pytz
+beautifulsoup4
+webdriver-manager
+apprise
+python-dotenv
+undetected-chromedriver
+setuptools
+selenium==4.27.1
+certifi
+jinja2
+cryptography
+pydantic
+firebase-admin
+Flask
+prompt-toolkit
+ruamel.yaml

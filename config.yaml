@@ -1,0 +1,90 @@
+---
+# Flathunter config for an apartment search in Berlin (max. 1600 € warm)
+
+loop:
+    active: yes
+    sleeping_time: 600     # check every ~10 minutes (don't go much lower: bot detection)
+    random_jitter: True
+
+urls:
+  # ImmoScout24: Berlin, Wohnung mieten, Warmmiete <= 1600 €, no Wohnungstausch, newest first
+  - https://www.immobilienscout24.de/Suche/de/berlin/berlin/wohnung-mieten?price=-1600.0&numberofrooms=2.0-&livingspace=60.0-&pricetype=calculatedtotalrent&exclusioncriteria=swapflat&sorting=2
+  # Immowelt: Berlin, apartments, Kaltmiete <= 1350 € (~1600 € warm), newest first.
+  # Fetched through headless Chrome to get past Immowelt's bot protection.
+  - https://www.immowelt.de/classified-search?distributionTypes=Rent&estateTypes=Apartment&locations=AD08DE8634&priceMax=1350&roomsMin=2&spaceMin=60&order=DateDesc
+
+  # Kleinanzeigen: Berlin, Mietwohnungen <= 1600 €, 60+ m², 2+ Zimmer (parser patched locally, Oct 2026)
+  - https://www.kleinanzeigen.de/s-wohnung-mieten/berlin/preis::1600/c203l3331+wohnung_mieten.qm_d:60,+wohnung_mieten.zimmer_d:2,
+  # WG-Gesucht: Berlin, Wohnungen, Gesamtmiete <= 1600 €, 60+ m², 2+ Zimmer (parser patched locally, Oct 2026)
+  - https://www.wg-gesucht.de/wohnungen-in-Berlin.8.2.1.0.html?offer_filter=1&city_id=8&noDeact=1&categories%5B%5D=2&rMax=1600&sMin=60&rmMin=2
+
+filters:
+  max_price: 1600
+  min_rooms: 2
+  min_size: 60
+  excluded_titles:
+    - "tausch"                 # Wohnungstausch / Tauschwohnung
+    - '\bwbs\b'                # requires a Wohnberechtigungsschein
+    - "zwischenmiete"
+    - "untermiete"
+    - "sublet"
+    - "befristet"
+    - "auf zeit"
+    - "tempor"                 # temporär / temporary
+    - "möbl"                   # möbliert, möbl., vollmöbliert
+    - "moebl"
+    - "furnished"
+    - "senioren"
+    - '\bbis \d{2}\.\d{2}\.\d{4}'   # WG-Gesucht: has an end date ("vom ... bis ...")
+  # Inside the S-Bahn ring (approximate, by postcode).
+  allowed_postcodes:
+    - "1011[579]|1017[89]"              # Mitte
+    - "1024[3579]"                      # Friedrichshain
+    - "1040[579]|1043[579]"             # Prenzlauer Berg
+    - "1096[13579]|1099[79]"            # Kreuzberg
+    - "1055[13579]|1078[57]"            # Moabit, Tiergarten
+    - "1077[79]|1078[139]|1082[3579]"   # Schöneberg
+    - "1058[579]|1062[3579]|14059"      # Charlottenburg
+    - "1070[79]|1071[13579]"            # Wilmersdorf
+    - "1204[3579]|1205[1359]"           # Nord-Neukölln
+    - "1334[7]|1335[3579]"              # Wedding, Gesundbrunnen
+  # Used when an address has no postcode (e.g. WG-Gesucht shows only the district)
+  allowed_districts:
+    - Mitte
+    - Moabit
+    - Tiergarten
+    - Wedding
+    - Gesundbrunnen
+    - Prenzlauer Berg
+    - Friedrichshain
+    - Kreuzberg
+    - Neukölln
+    - Schöneberg
+    - Charlottenburg
+    - Wilmersdorf
+
+message: |
+    {crawler}: {title}
+    Zimmer: {rooms}
+    Größe: {size} m²
+    Preis: {price}
+    Ort: {address}
+
+    {url}
+
+title: "{crawler}: {title}"
+
+notifiers:
+  - telegram
+
+# Secrets are NOT stored here (this file is public). They come from environment variables:
+#   FLATHUNTER_TELEGRAM_BOT_TOKEN and FLATHUNTER_TELEGRAM_RECEIVER_IDS
+# Locally they're read from the .env file (git-ignored); on GitHub from repository secrets.
+telegram:
+  notify_with_images: true
+
+captcha:
+
+# If ImmoScout24 starts blocking (403 / no results), open immobilienscout24.de in your
+# normal browser, press F12 > Application > Cookies, copy the "reese84" value here.
+immoscout_cookie: ""

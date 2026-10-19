@@ -34,7 +34,7 @@ class Kleinanzeigen(WebdriverCrawler):
                 if date_string is not None:
                     expose['from'] = "01." + self.MONTHS[date_string[1]] + "." + date_string[2]
         if 'from' not in expose:
-            expose['from'] = datetime.datetime.now().strftime('%02d.%02m.%Y')
+            expose['from'] = datetime.datetime.now().strftime('%d.%m.%Y')
         return expose
 
     # pylint: disable=too-many-locals
@@ -42,6 +42,12 @@ class Kleinanzeigen(WebdriverCrawler):
         """Extracts all exposes from a provided Soup object"""
         entries = []
         soup = raw_data.find(id="srchrslt-adtable")
+        if not isinstance(soup, Tag):
+            logger.warning("No Kleinanzeigen result list found")
+            return entries
+
+        if not soup.find("article", class_="aditem"):
+            return self.extract_card_data(soup)
 
         exposes = soup.find_all("article", class_="aditem")
         for  expose in exposes:
@@ -98,6 +104,45 @@ class Kleinanzeigen(WebdriverCrawler):
 
         logger.debug('Number of entries found: %d', len(entries))
 
+        return entries
+
+    def extract_card_data(self, result_list: Tag):
+        """Extracts exposes from the newer card layout (<article data-adid=...>),
+        which uses utility CSS classes, so fields are located by structure and text"""
+        entries = []
+        for expose in result_list.find_all("article", attrs={"data-adid": True}):
+            url = expose.get("data-href")
+            title_elem = expose.find("h3")
+            if not url or not isinstance(title_elem, Tag):
+                continue
+            texts = [" ".join(p.get_text(" ", strip=True).split()) for p in expose.find_all("p")]
+
+            address = ""
+            for span in expose.find_all("span"):
+                span_text = " ".join(span.get_text(" ", strip=True).split())
+                if re.match(r'\d{5}\s', span_text):
+                    address = span_text
+                    break
+
+            facts = next((t for t in texts if re.search(r'm²|Zi\.', t)), "")
+            size_match = re.search(r'([\d.,]+)\s*m²', facts)
+            rooms_match = re.search(r'([\d.,]+)\s*Zi\.', facts)
+            price = next((t for t in texts if re.match(r'^[\d.,]+\s*€', t)), "")
+            image = expose.find("img")
+
+            entries.append({
+                'id': int(expose.get("data-adid")),
+                'image': image.get("src") if isinstance(image, Tag) else None,
+                'url': "https://www.kleinanzeigen.de" + url,
+                'title': title_elem.get_text(" ", strip=True),
+                'price': price,
+                'size': size_match[1] if size_match else "",
+                'rooms': rooms_match[1] if rooms_match else "",
+                'address': address,
+                'crawler': self.get_name()
+            })
+
+        logger.debug('Number of entries found: %d', len(entries))
         return entries
 
     def load_address(self, url):

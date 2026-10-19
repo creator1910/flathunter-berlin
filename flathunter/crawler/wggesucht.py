@@ -147,6 +147,54 @@ def parse_expose_element_to_details(row: Tag, crawler: str) -> Optional[Dict]:
     return details
 
 
+def parse_card_to_details(card: Tag, crawler: str) -> Optional[Dict]:
+    """Parse an expose from the newer card layout (<a class="wgg-list-card">)"""
+    content = card.find("div", {"class": "card-content"})
+    if not isinstance(content, Tag) or "card-content-partner" in (content.get("class") or []):
+        logger.debug("Partner advert found - skipping")
+        return None
+    href = card.get("href")
+    ad_id = card.get("data-id")
+    if not isinstance(href, str) or not isinstance(ad_id, str) or not ad_id.isdigit():
+        logger.debug("No expose URL found - skipping")
+        return None
+
+    def text_of(element) -> str:
+        return " ".join(element.get_text(" ", strip=True).split()) if isinstance(element, Tag) else ""
+
+    title = text_of(content.find("span", {"class": "ad-title"}))
+    price = text_of(content.select_one(".price-row .card-main-text"))
+    size = text_of(content.find("span", {"class": "size-value"}))
+    middle = content.find("div", {"class": "middle-row"})
+    dates = re.findall(r'\d{2}\.\d{2}\.\d{4}', text_of(middle))
+    # subtitle looks like "2-Zimmer-Wohnung · Berlin Kreuzberg · Oranienstraße 5"
+    subtitle = [part.strip() for part in text_of(content.find("div", {"class": "ad-subtitle"})).split("·")]
+    rooms_match = re.search(r'(\d+)-Zimmer', subtitle[0]) if subtitle else None
+    address = ", ".join(reversed([part for part in subtitle[1:] if part]))
+    image = card.find("img")
+
+    if len(dates) == 2:
+        title = f"{title} vom {dates[0]} bis {dates[1]}"
+    elif len(dates) == 1:
+        title = f"{title} ab dem {dates[0]}"
+    details = {
+        'id': int(ad_id),
+        'image': image.get("src") if isinstance(image, Tag) else None,
+        'url': 'https://www.wg-gesucht.de/' + href.removeprefix("/"),
+        'title': title,
+        'price': price,
+        'size': size,
+        'rooms': rooms_match[1] if rooms_match else "",
+        'address': address,
+        'crawler': crawler
+    }
+    if dates:
+        details['from'] = dates[0]
+    if len(dates) == 2:
+        details['to'] = dates[1]
+    return details
+
+
 def liste_attribute_filter(element: Union[Tag, str]) -> bool:
     """Return true for elements whose 'id' attribute starts with 'liste-' 
     and are not contained in the 'premium_user_extra_list' container"""
@@ -173,6 +221,15 @@ class WgGesucht(Crawler):
     def extract_data(self, raw_data: BeautifulSoup) -> List[Dict]:
         """Extracts all exposes from a provided Soup object"""
         entries = []
+
+        cards = raw_data.select("a.wgg-list-card")
+        if cards:
+            for card in cards:
+                details = parse_card_to_details(card, self.get_name())
+                if details is not None:
+                    entries.append(details)
+            logger.debug('Number of entries found: %d', len(entries))
+            return entries
 
         findings = raw_data.find_all(liste_attribute_filter)
         existing_findings = [

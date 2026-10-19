@@ -397,6 +397,14 @@ Preis: {price}
         """Return the configured maximum price per square meter"""
         return self._get_filter_config("max_price_per_square")
 
+    def allowed_postcodes(self):
+        """Return the configured regex patterns of allowed postcodes"""
+        return self._get_filter_config("allowed_postcodes")
+
+    def allowed_districts(self):
+        """Return district names to allow for addresses without a postcode"""
+        return self._get_filter_config("allowed_districts")
+
     def immoscout_cookie(self):
         """Return the precalculated immoscout cookie"""
         return self._read_yaml_path('immoscout_cookie', None)

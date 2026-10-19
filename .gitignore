@@ -93,7 +93,6 @@ ENV/
 processed_ids.db
 
 .idea/
-config.yaml
 
 # Vim
 .*.swp
@@ -109,3 +108,5 @@ requirements.txt
 
 # OS files
 .DS_Store
+# local virtualenv
+.venv/

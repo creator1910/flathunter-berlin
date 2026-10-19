@@ -6,9 +6,9 @@ import hashlib
 from bs4 import BeautifulSoup, Tag
 
 from flathunter.logging import logger
-from flathunter.abstract_crawler import Crawler
+from flathunter.webdriver_crawler import WebdriverCrawler
 
-class Immowelt(Crawler):
+class Immowelt(WebdriverCrawler):
     """Implementation of Crawler interface for ImmoWelt"""
 
     URL_PATTERN = re.compile(r'https://www\.immowelt\.de')
@@ -20,7 +20,7 @@ class Immowelt(Crawler):
     def get_expose_details(self, expose):
         """Loads additional details for an expose by processing the expose detail URL"""
         soup = self.get_page(expose['url'])
-        date = datetime.datetime.now().strftime("%2d.%2m.%Y")
+        date = datetime.datetime.now().strftime("%d.%m.%Y")
         expose['from'] = date
 
         immo_div = soup.find("app-estate-object-informations")
@@ -40,7 +40,7 @@ class Immowelt(Crawler):
                     re.MULTILINE|re.DOTALL|re.IGNORECASE
                 )
                 if no_exact_date_given:
-                    date = datetime.datetime.now().strftime("%2d.%2m.%Y")
+                    date = datetime.datetime.now().strftime("%d.%m.%Y")
                 break
         expose['from'] = date
         return expose
@@ -89,11 +89,32 @@ class Immowelt(Crawler):
             except IndexError:
                 rooms = ""
 
+            # Newer card layout: key facts live in the description box text,
+            # e.g. "1.200 € Kaltmiete Wohnung zur Miete · 3 Zimmer · 95 m² · 4. Geschoss"
+            box = adv.find("div", attrs={"data-testid": "cardmfe-description-box-text-test-id"})
+            if isinstance(box, Tag):
+                box_text = " ".join(box.get_text(" ", strip=True).split())
+                if not rooms:
+                    match = re.search(r"([\d,.]+)\s*Zimmer", box_text)
+                    rooms = match.group(1) if match else ""
+                if not size:
+                    match = re.search(r"([\d,.]+)\s*m²", box_text)
+                    size = match.group(1) if match else ""
+                if not title.strip():
+                    title = re.sub(r'^.*?(Kalt|Warm)miete\s*', '', box_text)
+                    address_el = adv.find(
+                        "div", attrs={"data-testid": "cardmfe-description-box-address"})
+                    if isinstance(address_el, Tag):
+                        title = title.replace(address_el.get_text(" ", strip=True), "")
+                    title = title.strip(" ·")
+
             id_element = adv.find("a")
             try:
                 url = id_element.get("href")
                 if "https" not in url:
                     url = "https://immowelt.de/" + url
+                # drop tracking query/fragment so the URL (and the id derived from it) is stable
+                url = url.split("?")[0].split("#")[0]
             except (AttributeError, TypeError):
                 continue
 
