@@ -19,7 +19,7 @@ class ExposeHelper:
     @staticmethod
     def get_price(expose):
         """Extracts the price from a price text"""
-        price_match = re.search(r'\d+([\.,]\d+)?', expose['price'])
+        price_match = re.search(r'\d+([\.,]\d+)?', expose.get('price') or '')
         if price_match is None:
             return None
         return float(price_match[0].replace(".", "").replace(",", "."))
@@ -27,7 +27,7 @@ class ExposeHelper:
     @staticmethod
     def get_size(expose):
         """Extracts the size from a size text"""
-        size_match = re.search(r'\d+([\.,]\d+)?', expose['size'])
+        size_match = re.search(r'\d+([\.,]\d+)?', expose.get('size') or '')
         if size_match is None:
             return None
         return float(size_match[0].replace(",", "."))
@@ -35,7 +35,7 @@ class ExposeHelper:
     @staticmethod
     def get_rooms(expose):
         """Extracts the number of rooms from a room text"""
-        rooms_match = re.search(r'\d+([\.,]\d+)?', expose['rooms'])
+        rooms_match = re.search(r'\d+([\.,]\d+)?', expose.get('rooms') or '')
         if rooms_match is None:
             return None
         return float(rooms_match[0].replace(",", "."))
